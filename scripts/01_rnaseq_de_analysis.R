@@ -214,10 +214,10 @@ cat("Saved edgeR results table to results/tables/edger_sars_vs_mock_all_genes.cs
 cat("\n--- limma-voom ---\n")
 v <- voom(dge, design_mat, plot=FALSE)
 
-png("results/figures/06b_limma_voom_plot.png", width = 2100, height = 1800, res = 300)
+png("results/figures/07_limma_voom_plot.png", width = 2100, height = 1800, res = 300)
 voom(dge, design_mat, plot=TRUE)
 dev.off()
-cat("Saved limma-voom trend plot to results/figures/06b_limma_voom_plot.png\n")
+cat("Saved limma-voom trend plot to results/figures/07_limma_voom_plot.png\n")
 
 fit_limma <- lmFit(v, design_mat)
 fit_limma <- eBayes(fit_limma)
