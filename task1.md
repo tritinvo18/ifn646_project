@@ -42,13 +42,6 @@ Because DESeq2 and edgeR perfectly validate each other on those 8 targets, they 
 | **LPL** | ENSG00000175445 | 8 | protein_coding | Upregulated |
 | **XAF1** | ENSG00000132530 | 17 | protein_coding | Upregulated |
 
-Several of these consensus genes (e.g., OAS2, IFI27, CXCL11, XAF1) are well-known interferon-stimulated genes (ISGs) and play a strong role in anti-viral immune responses, giving high biological confidence to the results.
-
 ## Chromosome 1 and 2 Candidates
 A subset of priority target candidates on Chromosomes 1 and 2 was selected for potential downstream evaluation (Tasks 2 and 3). 
 These were filtered for `protein_coding` biotype and relaxed significance thresholds (padj < 0.10 in either pipeline). CRISPR modalities were assigned based on the direction of differential expression (e.g., *CRISPRi (Repression)* for upregulated targets and *CRISPRa (Activation)* for downregulated targets). Notable genes in this list include **GBP4** (Chr 1), **REG3A** (Chr 2), and **SLC16A1** (Chr 1).
-
-## Output Files
-The analysis produced comprehensive outputs located in the `results/` directory.
-* **Tables** (`results/tables/`): Full DESeq2 and edgeR results, strict consensus DEGs, and the Chr 1/Chr 2 candidate list.
-* **Figures** (`results/figures/`): Quality control plots (PCA, sample distance/correlation heatmaps), pipeline-specific diagnostic plots (dispersion, MA, BCV, MD), and cross-tool comparison visualizations (Venn diagram, LFC concordance scatter plot, volcano plot, and expression heatmap of top candidates).
