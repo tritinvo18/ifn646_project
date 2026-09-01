@@ -1,0 +1,7 @@
+,condition,batch
+S_2_Rem_5dpi_S70001,CovRem,2
+S_2_SARS_5dpi_S70003,CovOnly,2
+S_2_mock_5dpi_S70002,Control,2
+S_3_Rem_5dpi_S69995,CovRem,3
+S_3_SARS_5dpi_S69996,CovOnly,3
+S_3_mock_5dpi_S69997,Control,3
