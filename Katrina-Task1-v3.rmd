@@ -1,0 +1,413 @@
+---
+title: "IFN646 Task 1"
+author: "Katrina"
+date: today
+format:
+  html:
+    theme: flatly
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    toc-location: left
+    toc-title: "Contents"
+    code-fold: show
+    code-tools: true
+    code-overflow: wrap
+    df-print: paged
+    fig-width: 8
+    fig-height: 5
+    fig-align: center
+    embed-resources: true
+execute:
+  warning: false
+  message: false
+---
+
+```{r setup, include = FALSE}
+# Load libraries and packages
+library(tidyverse)
+library(RColorBrewer)
+library(DESeq2)
+library(pheatmap)
+library(ggrepel)
+library(ashr)
+library(edgeR)
+
+# As for workshop - check environment setup so it matches VM
+for (p in c("tidyverse", "RColorBrewer", "pheatmap", "BiocManager",
+            "ggplot2", "ggrepel", "ashr"))
+  if (!requireNamespace(p, quietly = TRUE))
+    install.packages(p)
+
+for (p in c("DESeq2", "DEGreport", "edgeR"))
+  if (!requireNamespace(p, quietly = TRUE))
+    BiocManager::install(p)
+```
+
+# Task 1
+
+## Load data and explore
+
+### Background to the data
+
+Background to the experiment is available from the [GEO record for GSE159717](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE159717). Key points:
+
+- Title: SARS-CoV-2 infection of human pancreatic islets
+- Summary: We performed RNA-sequencing in uninfected, SARS-CoV-2-infected, and additionally remdesivir treated ex vivo cultured human islets from two donors to shed light on the transcriptional changes occurring upon viral infection.
+- Overall design: Islet preparations of two different donors were infected with SARS-CoV-2 and treated with Remdesivir for 5 days. Uninfected pancreatic islets served as control.
+
+The paper written by the authors of the dataset was published in *Nature Metabolism*: [Müller et al. (2021)](https://www.nature.com/articles/s42255-021-00347-1).
+
+In terms of experimental design:
+
+- mock: control, not infected
+- SARS: infected with SARS-CoV-2
+- Rem: infected and treated with remdesivir (antiviral drug)
+
+Samples were taken from two donors.
+
+This analysis focuses on the **SARS vs mock** contrast, which identifies genes deregulated by infection and provides the candidate list for Task 2. The remdesivir samples are retained in the model, as including all samples improves the dispersion estimates that the SARS vs mock test depends on, but no remdesivir contrast is extracted here.
+
+### Data load and basic summary
+
+The raw TSV has six identifier columns before the sample columns (a different structure to the Workshop 4 dataset), and there is no accompanying metadata file.
+
+```{r dataload}
+# Load counts file and inspect dimensions
+counts_file <- "gse159717_rnaseq_deseq_5dpi_counts_raw.tsv"
+
+raw <- read.delim(counts_file, header = TRUE, check.names = FALSE)
+dim(raw)
+```
+
+There are 60,683 rows and 12 columns, six of which are identifiers rather than samples and so require separating out before analysis.
+
+```{r datasplit}
+# pull annotation columns
+anno <- raw[, 1:6]
+rownames(anno) <- raw$gene_id
+
+# pull out data
+data <- as.matrix(raw[, 7:ncol(raw)])
+rownames(data) <- raw$gene_id
+mode(data) <- "integer"
+
+# check
+dim(data)
+sum(is.na(data))
+head(data)
+colSums(data)
+```
+
+### Build metadata
+
+No metadata file was supplied with this dataset, so the sample table is reconstructed by parsing the column names, which encode donor and treatment.
+
+```{r meta}
+meta <- data.frame(
+  row.names  = colnames(data),
+  subject    = factor(sub("^S_(\\d+)_.*",           "S\\1", colnames(data))),
+  sampletype = factor(sub("^S_\\d+_([A-Za-z]+)_.*", "\\1",  colnames(data)))
+)
+
+# mock is the control, so make it the reference level.
+# A positive log2 fold change then means "higher than mock".
+meta$sampletype <- relevel(meta$sampletype, ref = "mock")
+
+meta
+levels(meta$sampletype)
+table(meta$subject, meta$sampletype)
+
+# Check that sample names match in both files
+all(colnames(data) %in% rownames(meta))
+all(colnames(data) == rownames(meta))
+```
+
+## DESeq2 analysis
+
+### Create DESeq2 object
+
+```{r dds}
+# Create DESeq2Dataset object
+# Design by both subject and sample type
+
+dds <- DESeqDataSetFromMatrix(
+  countData = data,
+  colData   = meta,
+  design    = ~ subject + sampletype
+)
+
+dds
+
+# Check head of data
+head(counts(dds))
+```
+
+### Quality control
+
+#### Principal Components Analysis (PCA)
+
+As in the workshop, a normalised counts matrix is created for downstream visualisation.
+
+```{r sizefactors}
+dds <- estimateSizeFactors(dds)
+
+sizeFactors(dds)
+
+normalized_counts <- counts(dds, normalized = TRUE)
+
+head(normalized_counts, 3)
+```
+
+A PCA is used to sense check that the observed structure matches the experimental design, by:
+
+- Transforming the counts for data visualisation
+- Plotting the PCA
+
+```{r pca}
+# Transform counts for data visualization
+rld     <- rlog(dds, blind = TRUE)
+rld_mat <- assay(rld)
+
+# Plot PCA
+plotPCA(rld, intgroup = "sampletype")
+```
+
+The results look very different to the workshop example, which showed clear separation of principal components by group.
+
+```{r pca-check}
+# Plot PCA by different groupings to see if another underlying structure makes more sense.
+plotPCA(rld, intgroup = "subject")
+plotPCA(rld, intgroup = c("subject", "sampletype"))
+
+# Get PCA information
+pcaData <- plotPCA(rld, intgroup = c("subject", "sampletype"), returnData = TRUE)
+pcaData
+```
+
+As in the workshop, PC3 and PC4 are also inspected.
+
+```{r pc3-pc4}
+pca <- prcomp(t(rld_mat))
+summary(pca)$importance[, 1:5]
+
+df <- cbind(meta, pca$x)
+ggplot(df) +
+  geom_point(aes(x = PC3, y = PC4, colour = sampletype), size = 3)
+```
+
+PC1 accounts for 39% of variance (on the full 60k genes, not just the top 500), PC2 28% and PC3 20%. No single component dominates, and subject clearly dominates PC1. This supports including `subject` as a blocking term in the design.
+
+#### Hierarchical Clustering
+
+The `pheatmap` package is used to construct a correlation heatmap, using the rlog matrix extracted above.
+
+```{r heatmap}
+# Compute pairwise correlation values
+rld_cor <- cor(rld_mat)
+
+head(rld_cor)
+```
+
+```{r heatmap-formatted}
+# Sequential blue palette
+blues <- colorRampPalette(brewer.pal(9, "Blues"))(100)
+
+pheatmap(rld_cor,
+         color          = blues,
+         border_color   = "grey40",
+         fontsize       = 10,
+         fontsize_row   = 10,
+         fontsize_col   = 10,
+         annotation_col = meta)
+```
+
+### Differential Expression Analysis
+
+#### Dispersion estimates
+
+```{r dea}
+dds <- DESeq(dds)
+plotDispEsts(dds)
+```
+
+The dispersion plot looks acceptable. There are a few outliers sitting well above the fitted curve, but the curve has the expected shape (decreasing, then flattening) and the blue points are being pulled down toward the black band.
+
+Pre-filtering options are discussed in [Guardamino Ojeda on pre-filtering in DESeq2](https://medium.com/@davidguardaminoojeda/pre-filtering-in-deseq2-what-to-choose-b55ba09b2fc7).
+
+Further workflow detail is available in the [DESeq2 vignette](https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html).
+
+#### Setting the contrast
+
+**SARS vs mock**
+
+```{r res-sars}
+# Define contrast, extract results table, and shrink the log2 fold changes
+contrast_sars <- c("sampletype", "SARS", "mock")
+
+res_tableSARS_unshrunken <- results(dds, contrast = contrast_sars, alpha = 0.05)
+
+res_tableSARS <- lfcShrink(dds, contrast = contrast_sars,
+                           res = res_tableSARS_unshrunken, type = "ashr")
+```
+
+The MA plot shows the difference between two sets of measurements by transforming the data onto M (log ratio) and A (mean average) scales, plotting the mean of normalised counts against log2 fold change for all tested genes. Significantly differentially expressed genes are coloured.
+
+Unshrunken results:
+
+```{r ma-plot}
+plotMA(res_tableSARS_unshrunken, ylim = c(-2, 2))
+```
+
+Shrunken results:
+
+```{r ma-plot-shr}
+plotMA(res_tableSARS, ylim = c(-2, 2))
+```
+
+```{r summary-sars}
+# Summarize results
+summary(res_tableSARS)
+```
+
+#### Extract significant differentially expressed genes
+
+In the workshop, a large significant gene list made it difficult to isolate meaningful biological signal, so a fold change threshold was added. The gene list here is considerably smaller, so significance is called on adjusted p-value alone.
+
+```{r thresholds}
+### Set thresholds
+padj.cutoff <- 0.05
+```
+
+Convert the results table into a tibble.
+
+```{r tibbles}
+res_tableSARS_tb <- res_tableSARS %>%
+  data.frame() %>%
+  rownames_to_column(var = "gene") %>%
+  as_tibble()
+```
+
+Filter to retain only the significant genes.
+
+```{r sig}
+sigSARS <- res_tableSARS_tb %>%
+  filter(padj < padj.cutoff)
+
+nrow(sigSARS)
+sigSARS
+```
+
+#### Attaching gene symbols
+
+The workshop count file carried gene symbols as row names. Here the equivalent information sits in the six annotation columns separated out earlier, so it is joined back on by gene ID.
+
+```{r symbols}
+# Annotation lookup, defined once
+anno_tb <- anno %>%
+  rownames_to_column("gene") %>%
+  select(gene, gene_name, gene_biotype, location)
+
+sigSARS <- left_join(sigSARS, anno_tb, by = "gene")
+
+sigSARS %>% arrange(padj) %>% head(20)
+nrow(sigSARS)
+```
+
+#### Volcano plot
+
+Labelled with the top 10 genes by adjusted p-value, as in the workshop.
+
+```{r volcano-labelled}
+plot_volcano <- function(res_tb, title, n_label = 10) {
+  d <- res_tb %>%
+    left_join(anno_tb %>% select(gene, gene_name), by = "gene") %>%
+    filter(!is.na(padj)) %>%
+    arrange(padj) %>%
+    mutate(
+      threshold  = padj < padj.cutoff,
+      genelabels = ""
+    )
+
+  d$genelabels[1:min(n_label, nrow(d))] <- d$gene_name[1:min(n_label, nrow(d))]
+
+  ggplot(d, aes(x = log2FoldChange, y = -log10(padj))) +
+    geom_point(aes(colour = threshold), alpha = 0.6) +
+    geom_text_repel(aes(label = genelabels), max.overlaps = Inf) +
+    scale_colour_manual(values = c("grey70", "firebrick")) +
+    ggtitle(title) +
+    xlab("log2 fold change") +
+    ylab("-log10 adjusted p-value") +
+    theme(legend.position = "none",
+          plot.title = element_text(size = rel(1.5), hjust = 0.5),
+          axis.title = element_text(size = rel(1.25)))
+}
+
+plot_volcano(res_tableSARS_tb, "SARS-CoV-2 vs mock, 5 dpi")
+```
+
+Further options for displaying results are given in the [edgeR User's Guide](https://www.bioconductor.org/packages/release/bioc/vignettes/edgeR/inst/doc/edgeRUsersGuide.pdf).
+
+## edgeR analysis
+
+Sources and tutorials used for this section:
+
+- [edgeR User's Guide](https://www.bioconductor.org/packages/release/bioc/vignettes/edgeR/inst/doc/edgeRUsersGuide.pdf)
+- [Stanford tutorial](https://web.stanford.edu/class/bios221/labs/rnaseq/lab_4_rnaseq.html) — older, but a useful overview
+- [Neves and Sobral tutorial](https://gtpb.github.io/ADER18F/pages/tutorial1.html) — high level, with some useful points on comparing DESeq2 and edgeR
+
+The design of this project follows section 3.4 (Additive models and blocking) of the User's Guide:
+
+> Paired samples occur whenever we compare two treatments and each independent subject in the experiment receives both treatments... This is a paired design in which each subject receives both the control and the active treatment. We can therefore compare the treatment to the control for each patient separately, so that baseline differences between the patients are subtracted out. The design matrix is formed from an additive model formula without an interaction term.
+
+```{r edgeR-design}
+# Design matrix for edgeR
+design <- model.matrix(~ subject + sampletype, data = meta)
+colnames(design)
+```
+
+```{r edgeR-setup}
+# Build DGEList
+y <- DGEList(counts = data, samples = meta, genes = anno)
+
+# Filter out genes with too few counts
+keep <- filterByExpr(y, design)
+table(keep)
+y <- y[keep, , keep.lib.sizes = FALSE]
+
+# Normalise
+y <- normLibSizes(y)
+y$samples
+```
+
+Fit the model and estimate dispersion. edgeR uses the quasi-likelihood generalisation of the negative binomial model. From the User's Guide: in the QL pipeline, NB dispersions capture the global trend in biological variation, while quasi-dispersions account for gene-specific variability.
+
+```{r edgeR-model}
+# glmQL fit requires estimating dispersion first (User Guide 2.12)
+y <- estimateDisp(y, design, robust = TRUE)
+plotBCV(y)
+
+fit <- glmQLFit(y, design, robust = TRUE)
+plotQLDisp(fit)
+```
+
+Test for differential expression between SARS and mock.
+
+```{r edger-tests}
+# SARS compared to mock/control
+qlf_sars <- glmQLFTest(fit, coef = "sampletypeSARS")
+
+summary(decideTests(qlf_sars, p.value = 0.05))
+```
+
+edgeR returns no significant genes at this threshold, in contrast to DESeq2. This is consistent with a known difference in behaviour between the two tools rather than an error in either pipeline:
+
+> The contrast between the two tools in this context reveals a fundamental trade-off. DESeq2 appears more permissive and sensitive, which may be advantageous for exploratory analyses or hypothesis generation but potentially at the cost of precision and reproducibility. On the other hand, edgeR employs stricter criteria that may reduce the total number of reported DEGs but improve their specificity and cross-dataset stability. In the context of biomarker discovery or translational applications where reproducibility is paramount, the conservative profile of edgeR may be preferable.
+
+Rezapour M. Tool choice matters: Evaluating edgeR vs. DESeq2 for sensitivity, robustness, and cross-study performance. PLoS One. 2026 Jul 13;21(7):e0353788. doi: 10.1371/journal.pone.0353788. PMID: 42441585; PMCID: PMC13362148.
+
+The quasi-likelihood F-test used here is additionally more conservative than the likelihood ratio test, because it accounts for the uncertainty in the gene-wise dispersion estimates. With only two donors per condition that uncertainty is substantial.
+
+## limma-voom analysis
+
+## Comparison of results across tools
