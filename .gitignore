@@ -222,3 +222,4 @@ __marimo__/
 *.vcf
 *.vcf.gz
 *.fna.gz
+ref/

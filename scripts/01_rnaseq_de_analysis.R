@@ -1,6 +1,7 @@
 # Task 1: RNA-seq Differential Expression Analysis & Tool Consensus
+
 # Dataset: GSE159717 (SARS-CoV-2 infection of human islets, 5 dpi)
-# Tools compared: DESeq2 vs edgeR vs limma-voom
+# Tools compared: DESeq2 vs edgeR (LRT vs QL) vs limma-voom
 
 # Suppress package startup messages
 suppressPackageStartupMessages({
@@ -35,18 +36,11 @@ rownames(gene_annot) <- gene_annot$gene_id
 # Extract chromosome number from location string (e.g. chr1:11869-14409:+ -> 1)
 gene_annot$chromosome <- gsub("^chr([^:]+):.*$", "\\1", gene_annot$location)
 
-# Define sample columns
-sample_cols <- c("S_2_mock_5dpi_S70002", "S_2_SARS_5dpi_S70003", "S_2_Rem_5dpi_S70001",
-                 "S_3_mock_5dpi_S69997", "S_3_SARS_5dpi_S69996", "S_3_Rem_5dpi_S69995")
-
-# Construct metadata dataframe
-col_data <- data.frame(
-  sample_id = sample_cols,
-  donor     = factor(c("Donor_2", "Donor_2", "Donor_2", "Donor_3", "Donor_3", "Donor_3")),
-  condition = factor(c("mock", "SARS", "Rem", "mock", "SARS", "Rem"), levels = c("mock", "SARS", "Rem")),
-  row.names = sample_cols,
-  stringsAsFactors = FALSE
-)
+# Read metadata dataframe from external file
+col_data <- read.csv("metadata.csv", header = TRUE, row.names = 1, stringsAsFactors = FALSE)
+col_data$donor <- factor(col_data$donor)
+col_data$condition <- factor(col_data$condition, levels = c("mock", "SARS", "Rem"))
+sample_cols <- rownames(col_data)
 cat("\nExperimental Design Metadata:\n")
 print(col_data)
 
@@ -54,19 +48,30 @@ print(col_data)
 count_mat <- as.matrix(raw_data[, sample_cols])
 rownames(count_mat) <- raw_data$gene_id
 
+# Data integrity checks
+if (!all(colnames(count_mat) %in% rownames(col_data))) {
+  stop("Error: Count matrix columns are not in metadata rows!")
+}
+if (!all(colnames(count_mat) == rownames(col_data))) {
+  stop("Error: Count matrix columns and metadata rows are not perfectly aligned!")
+}
+cat("Data integrity check passed: Sample names align perfectly.\n")
+
 
 # EDA - Data Quality Assessment
 # ------------------------------------------------------------------------------
 
-# Filter genes: retain genes with >= 10 counts in at least 2 samples
-keep_genes <- rowSums(count_mat >= 10) >= 2
+# Filter genes: using edgeR::filterByExpr for statistically robust filtering
+design_mat_filter <- model.matrix(~ donor + condition, data = col_data)
+keep_genes <- filterByExpr(count_mat, design = design_mat_filter)
 filtered_counts <- count_mat[keep_genes, ]
 filtered_annot  <- gene_annot[keep_genes, ]
 
 cat("\nFiltering summary:\n")
 cat("Total genes before filtering:", nrow(count_mat), "\n")
-cat("Genes retained after filtering (>= 10 counts in >= 2 samples):", nrow(filtered_counts), "\n")
+cat("Genes retained after filtering (filterByExpr):", nrow(filtered_counts), "\n")
 cat("Genes filtered out:", nrow(count_mat) - nrow(filtered_counts), "\n\n")
+
 
 # DESeq2 Pipeline
 # ------------------------------------------------------------------------------
@@ -196,7 +201,7 @@ fit_edger <- glmFit(dge, design = design_mat)
 lrt_sars <- glmLRT(fit_edger, coef = "conditionSARS")
 edger_top <- topTags(lrt_sars, n = Inf)$table
 
-# edgeR MA/MD plot
+# edgeR MA/MD plot (LRT)
 png("results/figures/06_edger_md_plot.png", width = 2100, height = 1800, res = 300)
 plotMD(lrt_sars, status = decideTests(lrt_sars, p.value = 0.05, lfc = 1),
        main = "edgeR Mean-Difference (MD) Plot (SARS vs mock)")
@@ -206,6 +211,14 @@ cat("Saved edgeR MD plot to results/figures/06_edger_md_plot.png\n")
 # Save edgeR full results
 write.csv(edger_top, "results/tables/edger_sars_vs_mock_all_genes.csv", row.names = FALSE)
 cat("Saved edgeR results table to results/tables/edger_sars_vs_mock_all_genes.csv\n")
+
+# edgeR QL
+cat("\n--- edgeR (Quasi-Likelihood F-Test) ---\n")
+fit_edger_ql <- glmQLFit(dge, design = design_mat)
+qlf_sars <- glmQLFTest(fit_edger_ql, coef = "conditionSARS")
+edger_ql_top <- topTags(qlf_sars, n = Inf)$table
+write.csv(edger_ql_top, "results/tables/edger_ql_sars_vs_mock_all_genes.csv", row.names = FALSE)
+cat("Saved edgeR QL results table to results/tables/edger_ql_sars_vs_mock_all_genes.csv\n")
 
 
 # limma-voom Pipeline
@@ -231,166 +244,145 @@ cat("Saved limma-voom results table to results/tables/limma_voom_sars_vs_mock_al
 
 # Consensus Analysis & Tool Comparison
 # ------------------------------------------------------------------------------
-cat("\n--- Conducting Consensus Analysis (DESeq2 vs edgeR) ---\n")
+cat("\n--- Conducting Consensus Analysis (Comparing all frameworks) ---\n")
 
-# Criteria thresholds:
-# 1. Adjusted p-value (FDR) < 0.05
-# 2. Absolute Log2 Fold Change >= 1.0 (2-fold change)
 PADJ_CUTOFF <- 0.05
 LFC_CUTOFF  <- 1.0
 
 # Identify significant genes in DESeq2
-deseq_sig <- deseq_df %>%
-  filter(!is.na(padj) & padj < PADJ_CUTOFF & abs(log2FoldChange) >= LFC_CUTOFF)
+deseq_sig <- deseq_df %>% filter(!is.na(padj) & padj < PADJ_CUTOFF & abs(log2FoldChange) >= LFC_CUTOFF)
 
-# Identify significant genes in edgeR
-edger_sig <- edger_top %>%
-  filter(!is.na(FDR) & FDR < PADJ_CUTOFF & abs(logFC) >= LFC_CUTOFF)
+# Identify significant genes in edgeR (LRT)
+edger_sig <- edger_top %>% filter(!is.na(FDR) & FDR < PADJ_CUTOFF & abs(logFC) >= LFC_CUTOFF)
+
+# Identify significant genes in edgeR (QL)
+edger_ql_sig <- edger_ql_top %>% filter(!is.na(FDR) & FDR < PADJ_CUTOFF & abs(logFC) >= LFC_CUTOFF)
 
 # Identify significant genes in limma
-limma_sig <- limma_res %>%
-  filter(!is.na(adj.P.Val) & adj.P.Val < PADJ_CUTOFF & abs(logFC) >= LFC_CUTOFF)
+limma_sig <- limma_res %>% filter(!is.na(adj.P.Val) & adj.P.Val < PADJ_CUTOFF & abs(logFC) >= LFC_CUTOFF)
 
 cat("DESeq2 significant genes:", nrow(deseq_sig), "\n")
-cat("edgeR  significant genes:", nrow(edger_sig), "\n")
+cat("edgeR (LRT) significant genes:", nrow(edger_sig), "\n")
+cat("edgeR (QL)  significant genes:", nrow(edger_ql_sig), "\n")
 cat("limma-voom significant genes:", nrow(limma_sig), "\n")
 
-# Intersect significant gene IDs
-common_ids_de <- intersect(deseq_sig$gene_id, edger_sig$gene_id)
-common_ids_dl <- intersect(deseq_sig$gene_id, limma_sig$gene_id)
-common_ids_el <- intersect(edger_sig$gene_id, limma_sig$gene_id)
-
-# limma-voom returned 0 genes, so a 3-way intersection would be empty.
-# We will define the strict consensus based on the best pair (DESeq2 and edgeR).
-common_ids <- common_ids_de
-cat("Strict Consensus Genes (DESeq2 & edgeR):", length(common_ids), "\n")
-
-# Evaluate slightly more relaxed threshold (FDR < 0.10, |log2FC| >= 0.58)
-deseq_relaxed <- deseq_df %>%
-  filter(!is.na(padj) & padj < 0.10 & abs(log2FoldChange) >= 0.58)
-edger_relaxed <- edger_top %>%
-  filter(!is.na(FDR) & FDR < 0.10 & abs(logFC) >= 0.58)
-relaxed_common_ids <- intersect(deseq_relaxed$gene_id, edger_relaxed$gene_id)
-cat("Relaxed Consensus Genes (FDR < 0.10, |log2FC| >= 0.58):", length(relaxed_common_ids), "\n")
-
-# Log2 Fold Change Correlation Plot
-# Merge all tested genes
+# Merge all tested genes for pairwise comparisons
 comparison_df <- inner_join(
   deseq_df %>% dplyr::select(gene_id, gene_name, deseq_lfc = log2FoldChange, deseq_padj = padj, chromosome, gene_biotype),
   edger_top %>% dplyr::select(gene_id, edger_lfc = logFC, edger_fdr = FDR),
+  by = "gene_id"
+) %>% inner_join(
+  edger_ql_top %>% dplyr::select(gene_id, edger_ql_lfc = logFC, edger_ql_fdr = FDR),
   by = "gene_id"
 ) %>% inner_join(
   limma_res %>% dplyr::select(gene_id, limma_lfc = logFC, limma_padj = adj.P.Val),
   by = "gene_id"
 )
 
+# Select the two frameworks that yield the most significant genes
+sig_counts <- c(
+  "DESeq2" = nrow(deseq_sig),
+  "edgeR_LRT" = nrow(edger_sig),
+  "edgeR_QL" = nrow(edger_ql_sig),
+  "limma" = nrow(limma_sig)
+)
+sorted_frameworks <- names(sort(sig_counts, decreasing = TRUE))
+best_pair_names <- sorted_frameworks[1:2]
+cat(sprintf("\nSelecting best pair based on highest yield of significant genes: %s and %s\n", 
+    best_pair_names[1], best_pair_names[2]))
+
+sig_list <- list(
+  "DESeq2" = deseq_sig$gene_id,
+  "edgeR_LRT" = edger_sig$gene_id,
+  "edgeR_QL" = edger_ql_sig$gene_id,
+  "limma" = limma_sig$gene_id
+)
+
+lfc_col_map <- list(
+  "DESeq2" = "deseq_lfc",
+  "edgeR_LRT" = "edger_lfc",
+  "edgeR_QL" = "edger_ql_lfc",
+  "limma" = "limma_lfc"
+)
+
+best_sig_1 <- sig_list[[best_pair_names[1]]]
+best_sig_2 <- sig_list[[best_pair_names[2]]]
+
+common_ids <- intersect(best_sig_1, best_sig_2)
+cat(sprintf("Consensus Genes based on best pair: %d\n", length(common_ids)))
+
 comparison_df$status <- "Not DE"
-comparison_df$status[comparison_df$gene_id %in% deseq_sig$gene_id] <- "DESeq2 only"
-comparison_df$status[comparison_df$gene_id %in% edger_sig$gene_id] <- "edgeR only"
-comparison_df$status[comparison_df$gene_id %in% common_ids]       <- "Consensus DE"
-comparison_df$status <- factor(comparison_df$status, levels = c("Not DE", "DESeq2 only", "edgeR only", "Consensus DE"))
+comparison_df$status[comparison_df$gene_id %in% best_sig_1] <- paste(best_pair_names[1], "only")
+comparison_df$status[comparison_df$gene_id %in% best_sig_2] <- paste(best_pair_names[2], "only")
+comparison_df$status[comparison_df$gene_id %in% common_ids] <- "Consensus DE"
 
-# Compute Spearman rank correlation of log2FC
-cor_lfc <- cor(comparison_df$deseq_lfc, comparison_df$edger_lfc, method = "spearman", use = "complete.obs")
-cat("Spearman correlation of Log2 Fold Changes between DESeq2 and edgeR:", round(cor_lfc, 4), "\n")
+# Reorder factor for plotting
+comparison_df$status <- factor(comparison_df$status, levels = c("Not DE", paste(best_pair_names[1], "only"), paste(best_pair_names[2], "only"), "Consensus DE"))
 
-lfc_scatter <- ggplot(comparison_df, aes(x = deseq_lfc, y = edger_lfc, color = status)) +
+# Plot concordance of best pair
+x_col <- lfc_col_map[[best_pair_names[1]]]
+y_col <- lfc_col_map[[best_pair_names[2]]]
+
+cor_val <- cor(comparison_df[[x_col]], comparison_df[[y_col]], method="spearman", use="complete.obs")
+
+lfc_scatter <- ggplot(comparison_df, aes(x = .data[[x_col]], y = .data[[y_col]], color = status)) +
   geom_point(alpha = 0.6, size = 1.5) +
   geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "black") +
   geom_hline(yintercept = 0, linetype = "dotted", color = "grey50") +
   geom_vline(xintercept = 0, linetype = "dotted", color = "grey50") +
-  scale_color_manual(values = c("Not DE" = "#bdbdbd", "DESeq2 only" = "#3182bd", "edgeR only" = "#de2d26", "Consensus DE" = "#31a354")) +
   geom_text_repel(data = comparison_df %>% filter(status == "Consensus DE" | gene_name %in% c("ISG15", "IFI6", "GBP4", "PLEKHM3")),
                   aes(label = gene_name), size = 3.5, max.overlaps = 20, color = "black", box.padding = 0.5) +
   labs(
-    x = "DESeq2 Log2 Fold Change (shrunken)",
-    y = "edgeR Log2 Fold Change",
-    title = "Cross-Tool Concordance of Estimated Effect Sizes",
-    subtitle = paste0("Spearman Rank Correlation r = ", round(cor_lfc, 3))
+    x = best_pair_names[1],
+    y = best_pair_names[2],
+    title = sprintf("Concordance: %s vs %s", best_pair_names[1], best_pair_names[2]),
+    subtitle = sprintf("Spearman r = %.3f", cor_val)
   ) +
+  scale_color_manual(values = c("Not DE" = "#bdbdbd", 
+                                setNames("#3182bd", paste(best_pair_names[1], "only")), 
+                                setNames("#de2d26", paste(best_pair_names[2], "only")), 
+                                "Consensus DE" = "#31a354")) +
   theme_bw(base_size = 14) +
   theme(legend.position = "bottom", plot.title = element_text(face = "bold", hjust = 0.5))
 
-ggsave("results/figures/08_lfc_concordance_scatter.png", lfc_scatter, width = 8, height = 7, dpi = 300)
-cat("Saved LFC concordance scatter plot to results/figures/08_lfc_concordance_scatter.png\n")
-
-# Volcano Plots with Highlights
-volcano_df <- deseq_df %>%
-  mutate(
-    neg_log10_p = -log10(padj),
-    significance = case_when(
-      gene_id %in% common_ids ~ "Consensus DE",
-      padj < PADJ_CUTOFF & abs(log2FoldChange) >= LFC_CUTOFF ~ "DESeq2 DE",
-      TRUE ~ "NS"
-    )
-  )
-
-volcano_plot <- ggplot(volcano_df, aes(x = log2FoldChange, y = neg_log10_p, color = significance)) +
-  geom_point(alpha = 0.6, size = 1.5) +
-  scale_color_manual(values = c("NS" = "#bdbdbd", "DESeq2 DE" = "#3182bd", "Consensus DE" = "#31a354")) +
-  geom_vline(xintercept = c(-LFC_CUTOFF, LFC_CUTOFF), linetype = "dashed", color = "grey40") +
-  geom_hline(yintercept = -log10(PADJ_CUTOFF), linetype = "dashed", color = "grey40") +
-  geom_text_repel(data = volcano_df %>% filter(significance == "Consensus DE" | gene_name %in% c("ISG15", "IFI6", "GBP4", "PLEKHM3")),
-                  aes(label = gene_name), size = 3.8, max.overlaps = 25, color = "black", box.padding = 0.5) +
-  labs(
-    x = "Log2 Fold Change (SARS vs mock)",
-    y = "-Log10 Adjusted P-Value",
-    title = "DESeq2 Volcano Plot (SARS vs mock)"
-  ) +
-  theme_bw(base_size = 14) +
-  theme(legend.position = "bottom", plot.title = element_text(face = "bold", hjust = 0.5))
-
-ggsave("results/figures/09_volcano_plot.png", volcano_plot, width = 8, height = 7, dpi = 300)
-cat("Saved Volcano plot to results/figures/09_volcano_plot.png\n")
+ggsave("results/figures/08_lfc_concordance_scatter_best_pair.png", lfc_scatter, width = 8, height = 7, dpi = 300)
+cat("Saved LFC concordance scatter plot to results/figures/08_lfc_concordance_scatter_best_pair.png\n")
 
 
-# Build Comprehensive Consensus Tables & Chromosome 1 / 2 Subsets
+# Consensus Tables & Chromosome 1 / 2 Subsets
 # ------------------------------------------------------------------------------
 cat("\n--- Consensus Tables ---\n")
 
-# Merge metrics for consensus genes
 consensus_master <- comparison_df %>%
   filter(status == "Consensus DE") %>%
   left_join(filtered_annot %>% dplyr::select(gene_id, location), by = "gene_id") %>%
   arrange(deseq_padj)
 
-# Save strict consensus table
 write.csv(consensus_master, "results/tables/consensus_de_genes_strict.csv", row.names = FALSE)
 cat("Saved strict consensus genes to results/tables/consensus_de_genes_strict.csv\n")
-print(consensus_master)
 
-# List Chromosome 1 and Chromosome 2 prioritized table for Tasks 2 and 3!
-# includes both strict consensus and top high-significance candidates on Chr 1 and Chr 2
 chr1_2_table <- comparison_df %>%
   filter(chromosome %in% c("1", "2") & gene_biotype == "protein_coding") %>%
-  filter(deseq_padj < 0.10 | edger_fdr < 0.10) %>%
+  filter(deseq_padj < 0.10 | edger_fdr < 0.10) %>% # Relaxed criteria based on the selected best pair frameworks
   left_join(filtered_annot %>% dplyr::select(gene_id, location), by = "gene_id") %>%
   arrange(deseq_padj)
 
-# Add suggested CRISPR modality
 chr1_2_table$crispr_modality <- ifelse(chr1_2_table$deseq_lfc > 0, "CRISPRi (Repression)", "CRISPRa (Activation)")
 
 write.csv(chr1_2_table, "results/tables/target_candidates_chr1_chr2.csv", row.names = FALSE)
 cat("\nSaved prioritized Chr1 / Chr2 target candidate table to results/tables/target_candidates_chr1_chr2.csv\n")
-cat("\nTop Candidate Genes on Chromosome 1 and Chromosome 2:\n")
-print(head(chr1_2_table, 15))
-
 
 # Heatmap of Top Differentially Expressed Genes Across All Conditions
 # ------------------------------------------------------------------------------
 cat("\n Expression heatmap for top candidates \n")
 top_genes_for_heatmap <- unique(c(consensus_master$gene_id, head(chr1_2_table$gene_id, 15)))
 
-# Extract normalized counts
 norm_counts <- counts(dds, normalized = TRUE)[top_genes_for_heatmap, ]
-# Z-score scale by row
 norm_counts_scaled <- t(scale(t(norm_counts)))
 
-# Match row labels with gene symbols
 rownames(norm_counts_scaled) <- gene_annot[top_genes_for_heatmap, "gene_name"]
 colnames(norm_counts_scaled) <- paste(col_data$donor, col_data$condition, sep = "_")
 
-# Annotation for columns
 annotation_col <- data.frame(
   Condition = col_data$condition,
   Donor     = col_data$donor,
