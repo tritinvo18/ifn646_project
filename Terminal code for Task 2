@@ -1,0 +1,45 @@
+# This will require the installation of a few extra things, the crucial one being gffread and I have lost the list of others that I installed to get this running but can dig up if required.
+
+# For initiating the kernel
+wsl
+
+# For setting the current directory
+cd "$(wslpath 'C:\Users\Jonathan\Desktop\Uni n11950111\IFN646\Group Project\Task 2')"
+
+# For verifying this has worked by printing a list of what is in the current directory
+ls -1h
+
+
+----------------------------------------------------------------------------------------------------
+
+# For locating SERPINB2 gene and saving it as its own standalone gff.file
+grep -E 'gene=SERPINB2(;|$)' GCF_000001405.26_GRCh38_genomic.gff > serpinb2.gff
+
+# Checking number of lines of annotations with word count (More detailed look below)
+wc -l serpinb2.gff
+
+# Checking the sequence id (field 1 in gff format) and sorting it, there should only be 1 sequence found
+cut -f1 serpinb2.gff | sort -u
+
+# Checking the feature type (field 3 in gff format) and sorting it while keeping a count (We should see CDS, exon, gene, mRNA)
+cut -f3 serpinb2.gff | sort | uniq -c
+
+# This is where we start to use gffread to extract a table with the chromosome, transcript start, transcript end, strand, exon count, then every exon as start-end
+gffread -w SERPINB2_transcripts.fa \
+        --table @chr,@start,@end,@strand,@numexons,@exons \
+        -g GCF_000001405.26_GRCh38_genomic.fna serpinb2.gff
+
+# Print to see the 2 transcripts that were extracted by the last step
+grep ">" SERPINB2_transcripts.fa
+
+# Using samtools faidx and feeding it the genome FASTA file and asking to find the sequence NC_000018.10 and extracting the sequence of base pairs into a new FASTA file.
+samtools faidx GCF_000001405.26_GRCh38_genomic.fna NC_000018.10:63887705-63887770 > SERPINB2_exon1.fa
+
+# Repeat the same but with extra padding of 100 base pairs before and after our first exon.
+samtools faidx GCF_000001405.26_GRCh38_genomic.fna NC_000018.10:63887605-63887870 > SERPINB2_exon1_padded.fa
+
+# Print the sequence of our exon
+cat SERPINB2_exon1.fa
+
+# Print the sequence of our exon with padding
+cat SERPINB2_exon1_padded.fa
