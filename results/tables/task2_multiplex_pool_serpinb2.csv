@@ -1,5 +1,5 @@
-#guideId,targetSeq,mitSpecScore,cfdSpecScore,offtargetCount,targetGenomeGeneLocus,Efficiency,Chari-Score,Xu-Score,Wu-Crispr-Score,Doench '14-Score,Wang-Score,Moreno-Mateos-Score,CCTop-Score,Doench-RuleSet3-Score,Out-of-Frame-Score,Lindel-Score,GrafEtAlStatus,grafType,Composite_Score
-13rev,GAGTTGTTACAGTTCAGACATGG,77,90,124,exon:SERPINB2,68,21,0.119631,58,42,81,36,65,69,78,74,GrafOK,,81.2
-40forw,TGAACTGTAACAACTCTCAGAGG,60,83,157,exon:SERPINB2,68,98,0.566003,58,58,77,25,72,107,70,85,GrafOK,,77.0
-90forw,AGAATAACCAGAGAACAACCAGG,54,80,236,exon:SERPINB2,71,68,0.183012,0,35,79,27,60,120,66,81,GrafOK,,76.4
-3rev,AGTTCAGACATGGTAATGACTGG,82,90,125,exon:SERPINB2,53,34,-0.300024,0,13,42,28,55,60,71,89,GrafOK,,75.2
+#guideId,targetSeq,mitSpecScore,cfdSpecScore,offtargetCount,targetGenomeGeneLocus,Efficiency,Chari-Score,Xu-Score,Wu-Crispr-Score,Doench '14-Score,Wang-Score,Moreno-Mateos-Score,CCTop-Score,Doench-RuleSet3-Score,Out-of-Frame-Score,Lindel-Score,GrafEtAlStatus,grafType,strand,Valid_Cut_Site,Composite_Score
+40forw,TGAACTGTAACAACTCTCAGAGG,60,83,157,exon:SERPINB2,68,98,0.566003,58,58,77,25,72,107,70,85,GrafOK,,+,True,77.0
+90forw,AGAATAACCAGAGAACAACCAGG,54,80,236,exon:SERPINB2,71,68,0.183012,0,35,79,27,60,120,66,81,GrafOK,,+,True,76.4
+50rev,TCTCTGAGTTGCTGTCTGACGGG,72,83,210,exon:SERPINB2,51,44,-0.525804,0,13,20,42,67,-21,67,90,GrafOK,,-,True,70.2
+77rev,TGAAATACCTGGTTGTTCTCTGG,74,85,160,exon:SERPINB2,37,13,-0.714081,0,10,26,19,67,-85,72,83,tt,,-,True,65.8
