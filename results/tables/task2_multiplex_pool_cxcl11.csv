@@ -1,0 +1,4 @@
+#guideId,targetSeq,mitSpecScore,cfdSpecScore,offtargetCount,targetGenomeGeneLocus,Efficiency,Chari-Score,Xu-Score,Wu-Crispr-Score,Doench '14-Score,Wang-Score,Moreno-Mateos-Score,CCTop-Score,Doench-RuleSet3-Score,Out-of-Frame-Score,Lindel-Score,GrafEtAlStatus,grafType,strand,Valid_Cut_Site,Has_SNP,Poly_T,Ineff,Enzymes,Composite_Score
+76forw,GAAAGGTGCATGACTCAAAGAGG,71,83,167,exon:CXCL11,65,94,0.41457,58,28,82,41,79,54,65,81,GrafOK,,+,True,,,,,75.8
+264forw,GAAGGGCATGGCTATAGCCTTGG,80,89,152,exon:CXCL11,54,52,0.410654,0,23,87,50,82,6,47,67,gcc,,+,True,,,,,75.0
+295forw,TTGTGTGCTACAGTTGTTCAAGG,74,91,165,exon:CXCL11,46,22,-0.042697,58,6,34,42,71,-38,69,89,tt,,+,True,,,,,73.0
