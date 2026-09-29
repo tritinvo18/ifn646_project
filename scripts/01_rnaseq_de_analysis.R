@@ -23,7 +23,7 @@ dir.create("results/tables", recursive = TRUE, showWarnings = FALSE)
 
 # Load Data & Experimental Metadata
 # ------------------------------------------------------------------------------
-counts_file <- "gse159717_rnaseq_deseq_5dpi_counts_raw.tsv"
+counts_file <- "data/gse159717_rnaseq_deseq_5dpi_counts_raw.tsv"
 cat("Loading raw counts from:", counts_file, "\n")
 raw_data <- read.delim(counts_file, header = TRUE, sep = "\t", stringsAsFactors = FALSE, quote = "")
 
@@ -37,7 +37,7 @@ rownames(gene_annot) <- gene_annot$gene_id
 gene_annot$chromosome <- gsub("^chr([^:]+):.*$", "\\1", gene_annot$location)
 
 # Read metadata dataframe from external file
-col_data <- read.csv("metadata.csv", header = TRUE, row.names = 1, stringsAsFactors = FALSE)
+col_data <- read.csv("data/metadata.csv", header = TRUE, row.names = 1, stringsAsFactors = FALSE)
 col_data$donor <- factor(col_data$donor)
 col_data$condition <- factor(col_data$condition, levels = c("mock", "SARS", "Rem"))
 sample_cols <- rownames(col_data)

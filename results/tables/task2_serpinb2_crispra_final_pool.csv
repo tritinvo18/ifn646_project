@@ -1,0 +1,5 @@
+#guideId,targetSeq,mapped_orientation,mapping_status,protospacer_start0,protospacer_end0,cut_boundary0,overlaps_first_exon,cut_inside_first_exon,mitSpecScore,cfdSpecScore,Efficiency,Composite_Score,poly_t_hard_exclusion,tt_terminal_warning,gc_percent,gc_warning,restriction_annotation_present
+40forw,TGAACTGTAACAACTCTCAGAGG,forward,UNIQUE,19,39,36,True,True,60,83,68,77.0,False,False,40.0,False,False
+90forw,AGAATAACCAGAGAACAACCAGG,forward,UNIQUE,69,89,86,True,True,54,80,71,76.4,False,False,40.0,False,False
+50rev,TCTCTGAGTTGCTGTCTGACGGG,reverse,UNIQUE,52,72,55,True,True,72,83,51,70.2,False,False,50.0,False,False
+77rev,TGAAATACCTGGTTGTTCTCTGG,reverse,UNIQUE,79,99,82,True,True,74,85,37,65.8,False,False,40.0,False,False
