@@ -21,7 +21,7 @@ However, this result applies only to these seven genomes. It does not establish 
 
 ## Genetic variation affected predicted off-target risk, but not on-target availability
 
-The analysis evaluated 1,688 of the 1,701 CRISPOR candidate off-target sites, corresponding to 99.24% of the selected candidate set. Across these sites, some individual variants strengthened potential off-target matches, while others weakened or removed them. Overall, created-or-strengthened allele observations occurred across 14 sample-guide combinations (all within SERPINB2). No completely new off-target sites were created among the evaluated candidates, but some existing candidate sites became more similar to their guide sequences.
+The analysis evaluated 1,457 of the 1,541 CRISPOR candidate off-target sites, corresponding to 94.55% of the selected candidate set. Across these sites, some individual variants strengthened potential off-target matches, while others weakened or removed them. Overall, created-or-strengthened allele observations occurred across 14 sample-guide combinations (all within SERPINB2). No completely new off-target sites were created among the evaluated candidates, but some existing candidate sites became more similar to their guide sequences.
 
 Therefore, individual genetic variation did not alter whether the guides could bind their intended targets, but it did produce individual-specific differences in predicted off-target risk.
 
