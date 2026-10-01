@@ -226,19 +226,24 @@ def plot_gene_grna_architecture(
 
     if 'guide_start' not in gene_guides.columns and 'protospacer_start0' in gene_guides.columns:
         search_start = max(1, exon1_start - 25)
-        gene_guides['guide_start'] = search_start + gene_guides['protospacer_start0']
+        gene_guides['guide_start'] = gene_guides.apply(
+            lambda r: search_start + int(r['protospacer_start0']) - (3 if str(r.get(strand_col, '+')).lower() in ('-', 'reverse', 'rev') else 0),
+            axis=1
+        )
         gene_guides['guide_end'] = gene_guides['guide_start'] + 22
 
     # Sort guides from lowest genomic start coordinate to highest
     gene_guides = gene_guides.sort_values('guide_start', ascending=True).reset_index(drop=True)
+    num_guides = len(gene_guides)
 
     # Calculate target window bounds encompassing Exon 1 and all guides with clean padding
     min_coord = min([exon1_start] + gene_guides['guide_start'].tolist()) - 35
     max_coord = max([exon1_end] + gene_guides['guide_end'].tolist()) + 35
 
-    # Create figure with 2 panels: Macro (full gene) and Micro (Exon 1 + gRNAs)
+    # Dynamically scale figure height to provide generous vertical spacing for any pool size
+    dyn_height = max(figsize[1], 4.5 + num_guides * 0.95)
     fig, (ax_macro, ax_micro) = plt.subplots(
-        2, 1, figsize=figsize, gridspec_kw={'height_ratios': [1, 2.3]}
+        2, 1, figsize=(figsize[0], dyn_height), gridspec_kw={'height_ratios': [1, max(2.3, num_guides * 0.35)]}
     )
     plt.subplots_adjust(hspace=0.4)
 
@@ -331,7 +336,7 @@ def plot_gene_grna_architecture(
     # -------------------------------------------------------------
     ax_micro.set_title(
         f"B. Target Locus Architecture: First Exon & Selected gRNA / PAM Binding Sites\n"
-        f"Exon 1 Window ({exon1_start:,} - {exon1_end:,}) with 4 Top-Ranked CRISPR Guides (Zero Overlap)",
+        f"Exon 1 Window ({exon1_start:,} - {exon1_end:,}) with {num_guides} Eligible CRISPR Guides (Zero Overlap)",
         fontsize=12, fontweight='bold', loc='left', pad=12
     )
 
@@ -500,7 +505,7 @@ def plot_gene_grna_architecture(
     return fig
 
 
-def plot_all_chromosome_targets(guides_df=None, output_dir=None, show=True):
+def plot_all_chromosome_targets(guides_df=None, output_dir=None, show=True, prefix="task3"):
     """
     Convenience wrapper to plot both chromosome targets (Chr 4 / CXCL11 and Chr 18 / SERPINB2).
 
@@ -512,6 +517,8 @@ def plot_all_chromosome_targets(guides_df=None, output_dir=None, show=True):
         Directory where generated figures will be stored.
     show : bool, default True
         Whether to display figures.
+    prefix : str, default 'task3'
+        Prefix for output filenames.
 
     Returns
     -------
@@ -522,7 +529,7 @@ def plot_all_chromosome_targets(guides_df=None, output_dir=None, show=True):
     for chrom, gene in [('4', 'CXCL11'), ('18', 'SERPINB2')]:
         out_p = None
         if output_dir:
-            out_p = Path(output_dir) / f"task3_{gene.lower()}_grna_architecture.png"
+            out_p = Path(output_dir) / f"{prefix}_{gene.lower()}_grna_architecture.png"
         figs[gene] = plot_gene_grna_architecture(
             gene_or_chrom=gene,
             guides_df=guides_df,

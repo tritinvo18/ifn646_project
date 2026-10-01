@@ -17,6 +17,8 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.vscode/
+ref/
 
 # Ruff stuff:
 .ruff_cache/
