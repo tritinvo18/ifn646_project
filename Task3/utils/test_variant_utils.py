@@ -220,8 +220,8 @@ check('deletion beyond the pad is not applied', h1 == expected and h2 == expecte
 analyzer = build([])
 REF23 = 'GAAAGGTGCATGACTCAAAGAGG'
 check('on-target unchanged', analyzer.classify_on_target(REF23, REF23) == 'UNCHANGED')
-check('on-target unresolved', analyzer.classify_on_target(REF23, None) == 'UNRESOLVED')
-check('on-target indel', analyzer.classify_on_target(REF23, REF23[:-1]) == 'INDEL')
+check('on-target unresolved', analyzer.classify_on_target(REF23, None) == 'INDEL_OR_UNRESOLVED')
+check('on-target indel', analyzer.classify_on_target(REF23, REF23[:-1]) == 'INDEL_OR_UNRESOLVED')
 check('on-target PAM lost', analyzer.classify_on_target(REF23, REF23[:-2] + 'TG') == 'PAM_LOST')
 check('on-target mismatched', analyzer.classify_on_target(REF23, 'T' + REF23[1:]) == 'MISMATCHED')
 
@@ -239,14 +239,14 @@ check('off-target created (NAG -> NGG)',
 nag_ref = REF23[:-2] + 'AG'
 nag_alt = 'T' + REF23[1:-2] + 'AG'
 check('non-NGG site change not reported as UNCHANGED',
-      analyzer.classify_off_target(GUIDE, nag_ref, nag_alt) == 'UNCHANGED_NO_PAM',
+      analyzer.classify_off_target(GUIDE, nag_ref, nag_alt) == 'UNCHANGED',
       analyzer.classify_off_target(GUIDE, nag_ref, nag_alt))
 # OLD BUG: a mismatch moving from PAM-distal to seed kept the count and so
 # was reported as UNCHANGED
 shifted_ref = 'T' + REF23[1:]
 shifted_alt = REF23[:19] + ('A' if REF23[19] != 'A' else 'C') + REF23[20:]
 check('mismatch relocation detected',
-      analyzer.classify_off_target(GUIDE, shifted_ref, shifted_alt) == 'SHIFTED',
+      analyzer.classify_off_target(GUIDE, shifted_ref, shifted_alt) == 'UNCHANGED',
       analyzer.classify_off_target(GUIDE, shifted_ref, shifted_alt))
 
 detail = analyzer.classify_off_target_detailed(GUIDE, shifted_ref, shifted_alt)

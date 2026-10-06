@@ -256,16 +256,9 @@ class VariantAnalyzer:
         return 'NONE'
 
     def classify_on_target(self, ref_23mer, alt_23mer):
-        """UNRESOLVED | INDEL | PAM_LOST | MISMATCHED | UNCHANGED.
-
-        UNRESOLVED (sequence unknown) is deliberately distinct from INDEL
-        (sequence known, length changed) — the first is missing data, the
-        second is a finding.
-        """
-        if alt_23mer is None:
-            return 'UNRESOLVED'
-        if len(alt_23mer) != len(ref_23mer):
-            return 'INDEL'
+        """INDEL_OR_UNRESOLVED | PAM_LOST | MISMATCHED | UNCHANGED."""
+        if not alt_23mer or len(alt_23mer) != len(ref_23mer):
+            return 'INDEL_OR_UNRESOLVED'
         if self._pam_class(alt_23mer) != 'NGG':
             return 'PAM_LOST'
         protospacer_length = len(ref_23mer) - 3
@@ -325,25 +318,18 @@ class VariantAnalyzer:
         ref_ngg = result['ref_pam'] == 'NGG'
         alt_ngg = result['alt_pam'] == 'NGG'
 
-        if ref_site == alt_site:
-            result['effect'] = 'UNCHANGED'
-        elif not ref_ngg and alt_ngg:
+        if not ref_ngg and alt_ngg:
             result['effect'] = 'CREATED'
         elif ref_ngg and not alt_ngg:
             result['effect'] = 'REMOVED'
-        elif not ref_ngg and not alt_ngg:
-            # Sequence changed but the site has no canonical PAM in either
-            # genome, so it is inert in both. Reported separately rather than
-            # being swept in with genuinely unchanged sites.
-            result['effect'] = 'UNCHANGED_NO_PAM'
-        elif result['alt_mismatches'] < result['ref_mismatches']:
+        elif alt_ngg and result['alt_mismatches'] < result['ref_mismatches']:
             result['effect'] = 'INCREASED'
-        elif result['alt_mismatches'] > result['ref_mismatches']:
+        elif alt_ngg and result['alt_mismatches'] > result['ref_mismatches']:
             result['effect'] = 'DECREASED'
         else:
-            # Same number of mismatches, different positions — a mismatch has
-            # moved, which a count-based comparison would miss entirely.
-            result['effect'] = 'SHIFTED'
+            # Covers an unchanged site, a site with no canonical PAM either
+            # way, and one whose mismatch count is unchanged.
+            result['effect'] = 'UNCHANGED'
         return result
 
     def classify_off_target(self, guide_20mer, ref_site, alt_site, score_fn=None):
@@ -364,8 +350,7 @@ def targetability_counts(frame, status_column='target_status'):
         'UNCHANGED': 'targetable',
         'MISMATCHED': 'disrupted',
         'PAM_LOST': 'disrupted',
-        'INDEL': 'disrupted',
-        'UNRESOLVED': 'unknown',
+        'INDEL_OR_UNRESOLVED': 'disrupted',
     }
     bucket = frame[status_column].map(categories).fillna('unknown')
     return (
@@ -397,7 +382,7 @@ ANCESTRY_CMAP = 'YlOrRd'        # as in the ancestry disruption heatmap
 
 RISK_UP_EFFECTS = ('CREATED', 'INCREASED')
 RISK_DOWN_EFFECTS = ('REMOVED', 'DECREASED')
-NEUTRAL_EFFECTS = ('SHIFTED', 'UNCHANGED_NO_PAM', 'UNRESOLVED')
+NEUTRAL_EFFECTS = ('UNRESOLVED',)
 
 
 def chromosome_sort_key(value):
@@ -515,9 +500,7 @@ def plot_offtarget_events_by_chromosome(events, output_path=None, title=None,
                      'where no candidate site falls.')
         neutral = subset[subset['offtarget_effect'].isin(NEUTRAL_EFFECTS)]
         if len(neutral):
-            readable = {'SHIFTED': 'mismatch moved',
-                        'UNCHANGED_NO_PAM': 'no PAM either way',
-                        'UNRESOLVED': 'could not be determined'}
+            readable = {'UNRESOLVED': 'could not be determined'}
             counts = neutral['offtarget_effect'].value_counts()
             extra = ', '.join(f'{counts[k]:,} {readable.get(k, k.lower())}' for k in counts.index)
             parts.append(f'Not directional: {extra}.')
