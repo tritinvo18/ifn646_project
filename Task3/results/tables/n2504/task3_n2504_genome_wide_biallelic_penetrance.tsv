@@ -1,15 +1,15 @@
-gene	mode	guide_id	cohort_size	biallelic_pass_n	biallelic_pass_pct	heterozygous_caution_n	heterozygous_caution_pct	homozygous_escape_fail_n	homozygous_escape_fail_pct	haplotypes_intact_pct	pam_lost_alleles	mismatched_alleles	indel_alleles	unresolved_alleles	indeterminate_n
-CXCL11	CRISPRi	106forw	2504	2504	100.0	0	0.0	0	0.0	100.0	0	0	0	0	0
-CXCL11	CRISPRi	145rev	2504	2504	100.0	0	0.0	0	0.0	100.0	0	0	0	0	0
-CXCL11	CRISPRi	169rev	2504	2504	100.0	0	0.0	0	0.0	100.0	0	0	0	0	0
-CXCL11	CRISPRi	295forw	2504	2504	100.0	0	0.0	0	0.0	100.0	0	0	0	0	0
-CXCL11	CRISPRi	261rev	2504	2503	99.96	1	0.04	0	0.0	99.98	1	0	0	0	0
-CXCL11	CRISPRi	264forw	2504	2503	99.96	1	0.04	0	0.0	99.98	0	1	0	0	0
-CXCL11	CRISPRi	98forw	2504	2502	99.92	2	0.08	0	0.0	99.96	0	2	0	0	0
-CXCL11	CRISPRi	76forw	2504	2501	99.88	3	0.12	0	0.0	99.94	0	2	1	0	0
-CXCL11	CRISPRi	77forw	2504	2501	99.88	3	0.12	0	0.0	99.94	0	2	1	0	0
-SERPINB2	CRISPRa	40forw	2504	2504	100.0	0	0.0	0	0.0	100.0	0	0	0	0	0
-SERPINB2	CRISPRa	77rev	2504	2504	100.0	0	0.0	0	0.0	100.0	0	0	0	0	0
-SERPINB2	CRISPRa	90forw	2504	2494	99.6	10	0.4	0	0.0	99.8	0	10	0	0	0
-SERPINB2	CRISPRa	51rev	2504	2488	99.36	16	0.64	0	0.0	99.68	16	0	0	0	0
-SERPINB2	CRISPRa	50rev	2504	2228	88.98	252	10.06	24	0.96	94.01	0	300	0	0	0
+gene	mode	guide_id	cohort_size	biallelic_pass_n	biallelic_pass_pct	heterozygous_caution_n	heterozygous_caution_pct	homozygous_escape_fail_n	homozygous_escape_fail_pct	haplotypes_intact_pct	pam_lost_alleles	mismatched_alleles	indel_alleles
+CXCL11	CRISPRi	106forw	2504	2504	100.0	0	0.0	0	0.0	100.0	0	0	0
+CXCL11	CRISPRi	145rev	2504	2504	100.0	0	0.0	0	0.0	100.0	0	0	0
+CXCL11	CRISPRi	169rev	2504	2504	100.0	0	0.0	0	0.0	100.0	0	0	0
+CXCL11	CRISPRi	295forw	2504	2504	100.0	0	0.0	0	0.0	100.0	0	0	0
+CXCL11	CRISPRi	261rev	2504	2503	99.96	1	0.04	0	0.0	99.98	1	0	0
+CXCL11	CRISPRi	264forw	2504	2503	99.96	1	0.04	0	0.0	99.98	0	1	0
+CXCL11	CRISPRi	98forw	2504	2502	99.92	2	0.08	0	0.0	99.96	0	2	0
+CXCL11	CRISPRi	76forw	2504	2501	99.88	3	0.12	0	0.0	99.94	0	2	1
+CXCL11	CRISPRi	77forw	2504	2501	99.88	3	0.12	0	0.0	99.94	0	2	1
+SERPINB2	CRISPRa	40forw	2504	2504	100.0	0	0.0	0	0.0	100.0	0	0	0
+SERPINB2	CRISPRa	77rev	2504	2504	100.0	0	0.0	0	0.0	100.0	0	0	0
+SERPINB2	CRISPRa	90forw	2504	2494	99.6	10	0.4	0	0.0	99.8	0	10	0
+SERPINB2	CRISPRa	51rev	2504	2488	99.36	16	0.64	0	0.0	99.68	16	0	0
+SERPINB2	CRISPRa	50rev	2504	2228	88.98	252	10.06	24	0.96	94.01	0	300	0

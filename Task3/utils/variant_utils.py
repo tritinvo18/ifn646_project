@@ -47,35 +47,18 @@ def record_end(record):
     return int(record.info['END']) if 'END' in record.info else record.pos + len(record.ref) - 1
 
 
-# Flags raised during haplotype reconstruction. Any flag means the personalised
-# sequence for that haplotype could NOT be determined, and the allele is
-# returned as None rather than silently falling back to the reference.
-BLOCKING_FLAGS = (
-    'SAMPLE_NOT_IN_VCF',      # sample id absent from this VCF
-    'MISSING_GT',             # genotype missing / partially missing ('./.')
-    'UNPHASED_MULTI_HET',     # >1 heterozygous record and phase unknown
-    'BAD_ALLELE_INDEX',       # GT references an ALT that does not exist
-    'SYMBOLIC_ALT',           # <DEL>, <CN0>, ... overlaps the site
-    'SPANNING_DELETION',      # '*' allele with no resolvable deletion record
-    'EDIT_OUTSIDE_WINDOW',    # variant extends beyond the padded fetch window
-    'REF_MISMATCH',           # VCF REF does not match the assembly
-    'EDIT_CONFLICT',          # two variants on one haplotype overlap
-)
-
 # How far either side of the target interval to fetch reference sequence and
-# variant records. Must exceed the longest deletion that could reach into the
-# target from outside it.
-DEFAULT_PAD = 500
+# variant records.
+DEFAULT_PAD = 50
 
 
 class VariantAnalyzer:
     """Reconstructs personalised haplotype sequences from a reference assembly
     and a phased VCF.
 
-    Design rule: every situation in which the personalised sequence cannot be
-    determined is reported, never assumed to be reference. Unresolvable
-    haplotypes come back as None with an explanatory status string so that
-    'we do not know' is never counted as 'no variant here'.
+    Where a genotype is missing or a variant cannot be applied, the reference
+    sequence is used for that position. Use `check_phasing` to confirm the
+    input is phased before relying on haplotype-level results.
     """
 
     def __init__(self, fasta_path, pad=DEFAULT_PAD, require_phased=True):
@@ -162,7 +145,8 @@ class VariantAnalyzer:
     def _get_overlapping_records(self, vcf, chrom, start, end, pad=None):
         """Every record whose REF span intersects the 1-based interval
         [start, end]. Fetches `pad` bases either side so that deletions
-        anchored outside the interval but reaching into it are not missed."""
+        anchored just outside the interval but reaching into it are not
+        missed; a deletion anchored further out than `pad` is not retrieved."""
         pad = self.pad if pad is None else pad
         fetch_start = max(0, start - 1 - pad)
         fetch_end = end + pad
@@ -177,9 +161,11 @@ class VariantAnalyzer:
         """Return (allele_1, allele_2, status) for the 1-based interval
         [start, end].
 
-        An allele is None when its sequence could not be determined; `status`
-        is 'REFERENCE_HOMOZYGOUS', 'RECONSTRUCTED', or
-        'UNRESOLVED:<FLAG>[,<FLAG>...]'.
+        `status` is one of NO_VCF_COVERAGE, REFERENCE_HOMOZYGOUS,
+        REFERENCE_ASSUMED or RECONSTRUCTED. A missing or unusable genotype
+        falls back to the reference sequence for both copies and is reported
+        as REFERENCE_ASSUMED; every other situation that cannot be applied is
+        skipped silently, leaving reference sequence at that position.
 
         Variants are applied on a per-reference-base grid spanning a padded
         window, so deletions that start before the interval or run past its
@@ -214,59 +200,38 @@ class VariantAnalyzer:
         # string in the anchor cell.
         cells = [list(padded), list(padded)]
         touched = [[False] * len(padded) for _ in range(2)]
-        flags = [set(), set()]
-        star_offsets = [[], []]
-
-        heterozygous_records = 0
-        unphased_heterozygote = False
 
         for record in records:
             try:
                 sample = record.samples[sample_id]
             except (KeyError, IndexError):
-                flags[0].add('SAMPLE_NOT_IN_VCF')
-                flags[1].add('SAMPLE_NOT_IN_VCF')
-                break
+                return target_reference, target_reference, 'REFERENCE_ASSUMED'
 
             genotype = sample.get('GT')
             if genotype is None or len(genotype) < 2 or any(a is None for a in genotype[:2]):
-                flags[0].add('MISSING_GT')
-                flags[1].add('MISSING_GT')
-                continue
-
-            if genotype[0] != genotype[1]:
-                heterozygous_records += 1
-                if not sample.phased:
-                    unphased_heterozygote = True
+                return target_reference, target_reference, 'REFERENCE_ASSUMED'
 
             for haplotype, allele_index in enumerate(genotype[:2]):
                 if allele_index == 0:
                     continue
                 if record.alts is None or allele_index > len(record.alts):
-                    flags[haplotype].add('BAD_ALLELE_INDEX')
                     continue
 
                 alt = str(record.alts[allele_index - 1]).upper()
                 reference_allele = str(record.ref).upper()
                 offset = record.pos - window_start
 
-                if alt.startswith('<'):
-                    flags[haplotype].add('SYMBOLIC_ALT')
-                    continue
-                if alt == '*':
-                    # Position deleted by an upstream deletion. That deletion
-                    # should be a separate record; verify after the loop that
-                    # it was actually applied rather than assuming it.
-                    star_offsets[haplotype].append(offset)
+                # Symbolic alternates, spanning-deletion '*' alleles, edits
+                # falling outside the window, reference mismatches and edits
+                # overlapping one already applied are all skipped, leaving
+                # reference sequence in place.
+                if alt.startswith('<') or alt == '*':
                     continue
                 if offset < 0 or offset + len(reference_allele) > len(padded):
-                    flags[haplotype].add('EDIT_OUTSIDE_WINDOW')
                     continue
                 if padded[offset:offset + len(reference_allele)] != reference_allele:
-                    flags[haplotype].add('REF_MISMATCH')
                     continue
                 if any(touched[haplotype][offset:offset + len(reference_allele)]):
-                    flags[haplotype].add('EDIT_CONFLICT')
                     continue
 
                 cells[haplotype][offset] = alt
@@ -275,34 +240,8 @@ class VariantAnalyzer:
                 for k in range(len(reference_allele)):
                     touched[haplotype][offset + k] = True
 
-        # Relative phase only matters when more than one heterozygous record
-        # overlaps the interval. With a single heterozygote the two haplotypes
-        # are {reference, variant} in an arbitrary order, which does not change
-        # any per-allele count.
-        if heterozygous_records > 1 and unphased_heterozygote:
-            flags[0].add('UNPHASED_MULTI_HET')
-            flags[1].add('UNPHASED_MULTI_HET')
-
-        for haplotype in range(2):
-            for offset in star_offsets[haplotype]:
-                covered = (
-                    0 <= offset < len(padded)
-                    and touched[haplotype][offset]
-                    and cells[haplotype][offset] == ''
-                )
-                if not covered:
-                    flags[haplotype].add('SPANNING_DELETION')
-
-        alleles = []
-        for haplotype in range(2):
-            if flags[haplotype]:
-                alleles.append(None)
-            else:
-                alleles.append(''.join(cells[haplotype][left:right]))
-
-        combined = sorted(flags[0] | flags[1])
-        status = 'UNRESOLVED:' + ','.join(combined) if combined else 'RECONSTRUCTED'
-        return alleles[0], alleles[1], status
+        alleles = [''.join(cells[haplotype][left:right]) for haplotype in range(2)]
+        return alleles[0], alleles[1], 'RECONSTRUCTED'
 
     # -- classification ------------------------------------------------
 
@@ -414,32 +353,6 @@ class VariantAnalyzer:
 # =====================================================================
 # Reporting helpers
 # =====================================================================
-
-def reconstruction_report(frame, status_column='reconstruction_status'):
-    """Count reconstruction outcomes and break the UNRESOLVED ones down by flag.
-
-    Run this on every personalised-target and personalised-off-target table
-    before interpreting any result — it is the audit trail showing how many
-    observations are genuine reference matches versus missing data.
-    """
-    statuses = frame[status_column].astype(str)
-    outcome = statuses.str.split(':').str[0]
-    summary = outcome.value_counts().rename_axis('outcome').reset_index(name='observations')
-    summary['percent'] = (summary['observations'] / len(statuses) * 100).round(3)
-
-    flag_counts = {flag: 0 for flag in BLOCKING_FLAGS}
-    for value in statuses[statuses.str.startswith('UNRESOLVED:')]:
-        for flag in value.split(':', 1)[1].split(','):
-            flag_counts[flag] = flag_counts.get(flag, 0) + 1
-    flags = (
-        pd.Series(flag_counts, name='observations')
-        .rename_axis('flag')
-        .reset_index()
-        .query('observations > 0')
-        .sort_values('observations', ascending=False)
-    )
-    return summary, flags
-
 
 def targetability_counts(frame, status_column='target_status'):
     """Per-allele counts split into targetable / disrupted / unknown.
