@@ -1,0 +1,10 @@
+gene	mode	guide_id	EUR_total	EUR_disrupted_n	EUR_disruption_pct	AFR_total	AFR_disrupted_n	AFR_disruption_pct	EAS_total	EAS_disrupted_n	EAS_disruption_pct	SAS_total	SAS_disrupted_n	SAS_disruption_pct	AMR_total	AMR_disrupted_n	AMR_disruption_pct
+CXCL11	CRISPRi	106forw	504	0	0.0	660	0	0.0	504	0	0.0	489	0	0.0	347	0	0.0
+CXCL11	CRISPRi	145rev	504	0	0.0	660	0	0.0	504	0	0.0	489	0	0.0	347	0	0.0
+CXCL11	CRISPRi	169rev	504	0	0.0	660	0	0.0	504	0	0.0	489	0	0.0	347	0	0.0
+CXCL11	CRISPRi	261rev	504	0	0.0	660	0	0.0	504	1	0.2	489	0	0.0	347	0	0.0
+CXCL11	CRISPRi	264forw	504	0	0.0	660	0	0.0	504	1	0.2	489	0	0.0	347	0	0.0
+CXCL11	CRISPRi	295forw	504	0	0.0	660	0	0.0	504	0	0.0	489	0	0.0	347	0	0.0
+CXCL11	CRISPRi	76forw	504	0	0.0	660	0	0.0	504	2	0.4	489	0	0.0	347	1	0.29
+CXCL11	CRISPRi	77forw	504	0	0.0	660	0	0.0	504	2	0.4	489	0	0.0	347	1	0.29
+CXCL11	CRISPRi	98forw	504	0	0.0	660	2	0.3	504	0	0.0	489	0	0.0	347	0	0.0

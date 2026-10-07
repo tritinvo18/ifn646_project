@@ -219,3 +219,6 @@ __marimo__/
 
 # macOS
 .DS_Store
+
+# Local working notes, not for the repo
+Task3/Task3_VCF_approach_and_changes.md
