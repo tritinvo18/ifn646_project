@@ -1,5 +1,4 @@
 import re
-import textwrap
 from pathlib import Path
 import pysam
 import numpy as np
@@ -390,7 +389,7 @@ def chromosome_sort_key(value):
     return (0, int(text)) if text.isdigit() else (1, text)
 
 
-def _render_events_by_chromosome(frame, chroms, output_path, heading, caption, show):
+def _render_events_by_chromosome(frame, chroms, output_path, heading, show):
     """Overview-and-detail figure of off-target events per chromosome.
 
     The upper panel is the honest overview: both directions on one shared,
@@ -413,7 +412,8 @@ def _render_events_by_chromosome(frame, chroms, output_path, heading, caption, s
 
     fig, (ax_all, ax_zoom) = plt.subplots(
         2, 1, figsize=(12, 9), dpi=300, sharex=True,
-        gridspec_kw={'height_ratios': [2, 1], 'hspace': 0.12})
+        gridspec_kw={'height_ratios': [2, 1], 'hspace': 0.28})
+    chrom_labels = [f'chr{c}' for c in chroms]
 
     # -- overview: both directions, one shared scale --------------------
     ax_all.bar(positions, up.to_numpy(), width=0.62, color=RISK_UP_COLOUR,
@@ -423,12 +423,37 @@ def _render_events_by_chromosome(frame, chroms, output_path, heading, caption, s
     ax_all.axhline(0, color='black', linewidth=0.8)
     span = max(up.max(), down.max()) or 1
     ax_all.set_ylim(-span * 1.15, span * 1.15)
+    # Only the risk-decreasing bars are annotated here. The risk-increasing
+    # counts are hairlines at this scale, so their labels would sit on the zero
+    # line and collide with these; the detail panel below already carries them.
+    for x, v in zip(positions, down.to_numpy()):
+        if v:
+            ax_all.annotate(f'{v:,}', (x, -v), xytext=(0, -4), textcoords='offset points',
+                            ha='center', va='top', fontsize=7.5, weight='bold')
     ax_all.set_ylabel('Observed Events\n(Haplotype Count)', fontsize=10, weight='bold')
     ax_all.yaxis.set_major_formatter(ticker.FuncFormatter(lambda v, _: f'{abs(int(v)):,}'))
     ax_all.yaxis.grid(True, linestyle=':', linewidth=0.6, alpha=0.6)
     ax_all.set_axisbelow(True)
-    ax_all.legend(loc='lower right', fontsize=9, frameon=True)
-    ax_all.set_title('Both directions, shared scale', fontsize=10, weight='bold', pad=6)
+    # 'best' rather than a fixed corner: which corner is free depends on the
+    # gene. A fixed 'lower right' buried SERPINB2's chr16 and chr17 bars and
+    # their labels under the legend box.
+    ax_all.legend(loc='best', fontsize=9, frameon=True, framealpha=0.95)
+    ax_all.set_title('Panel A: Both directions, shared scale',
+                     fontsize=10, weight='bold', pad=6)
+    # The risk-increasing bars are unreadable at this scale, so the panel says
+    # where to read them rather than leaving the reader to infer it. Grey and
+    # unemphasised: it is a pointer, not a finding.
+    ax_all.text(0.015, 0.97, 'See Panel B for risk-increasing event counts',
+                transform=ax_all.transAxes, ha='left', va='top',
+                fontsize=8.5, style='italic', color='#666666')
+    # The axes are shared, so matplotlib would label only the lower one. The
+    # bars here hang from a zero line in the middle of the panel, well away
+    # from the axis, so without its own labels this panel has to be read by
+    # counting bars across from Panel B.
+    ax_all.set_xticks(positions)
+    ax_all.set_xticklabels(chrom_labels, rotation=45, ha='right',
+                           fontsize=8, weight='bold')
+    ax_all.tick_params(axis='x', labelbottom=True)
 
     # -- detail: the risk-increasing bars, magnified ---------------------
     ax_zoom.bar(positions, up.to_numpy(), width=0.62, color=RISK_UP_COLOUR)
@@ -442,19 +467,20 @@ def _render_events_by_chromosome(frame, chroms, output_path, heading, caption, s
     ax_zoom.yaxis.set_major_formatter(ticker.FuncFormatter(lambda v, _: f'{int(v):,}'))
     ax_zoom.yaxis.grid(True, linestyle=':', linewidth=0.6, alpha=0.6)
     ax_zoom.set_axisbelow(True)
-    ax_zoom.set_title(
-        f'Detail: risk-increasing events only, magnified '
-        f'({span / zoom_span:.0f}x the scale above)',
-        fontsize=10, weight='bold', pad=6)
+    # Where the two directions are already comparable in size the lower panel
+    # is not a magnification of anything - SERPINB2 comes out at 1x - so the
+    # claim is only made when there is a real difference in scale.
+    magnification = span / zoom_span
+    zoom_title = 'Panel B: Risk-increasing events only'
+    if magnification >= 1.5:
+        zoom_title = f'{zoom_title}, magnified ({magnification:.0f}x the scale in Panel A)'
+    ax_zoom.set_title(zoom_title, fontsize=10, weight='bold', pad=6)
     ax_zoom.set_xticks(positions)
-    ax_zoom.set_xticklabels([f'chr{c}' for c in chroms], rotation=45, ha='right',
+    ax_zoom.set_xticklabels(chrom_labels, rotation=45, ha='right',
                             fontsize=9, weight='bold')
     ax_zoom.set_xlabel('Chromosome', fontsize=11, weight='bold')
 
     fig.suptitle(heading, fontsize=13, weight='bold')
-    if caption:
-        fig.text(0.5, -0.01, textwrap.fill(caption, 130), ha='center',
-                 fontsize=8.5, style='italic', va='top')
     fig.tight_layout(rect=(0, 0, 1, 0.95))
     if output_path:
         fig.savefig(output_path, bbox_inches='tight')
@@ -466,7 +492,7 @@ def _render_events_by_chromosome(frame, chroms, output_path, heading, caption, s
 
 
 def plot_offtarget_events_by_chromosome(events, output_path=None, title=None,
-                                        subtitle=None, show=True, split_by_gene=True):
+                                        show=True, split_by_gene=True):
     """Diverging horizontal bar chart of off-target events per chromosome.
 
     Risk-increasing events (CREATED, INCREASED) extend right of the zero line
@@ -479,8 +505,9 @@ def plot_offtarget_events_by_chromosome(events, output_path=None, title=None,
     and its own count scale, so the two can be reported separately.
 
     `events` needs 'chrom' and 'offtarget_effect' columns and may contain any
-    effect label; UNCHANGED rows are ignored. Non-directional effects are
-    summarised in the caption rather than given a colour of their own.
+    effect label; UNCHANGED rows are ignored. Non-directional effects
+    (UNRESOLVED) have no direction to plot, so they are counted in the
+    returned frame's source data but carry no bar of their own.
     """
     frame = events.copy()
     frame['chrom'] = frame['chrom'].astype(str)
@@ -491,25 +518,10 @@ def plot_offtarget_events_by_chromosome(events, output_path=None, title=None,
              if split_by_gene and 'gene' in frame.columns and frame['gene'].nunique() > 1
              else [None])
 
-    def build_caption(subset):
-        parts = [subtitle] if subtitle else []
-        # Chromosomes X and Y are absent by necessity, not by choice; saying so
-        # on the figure stops the gap being read as an oversight.
-        parts.append('Autosomes only: the 1000 Genomes 20190312 release has no chrY file, '
-                     'and its chrX file covers only the pseudoautosomal regions, '
-                     'where no candidate site falls.')
-        neutral = subset[subset['offtarget_effect'].isin(NEUTRAL_EFFECTS)]
-        if len(neutral):
-            readable = {'UNRESOLVED': 'could not be determined'}
-            counts = neutral['offtarget_effect'].value_counts()
-            extra = ', '.join(f'{counts[k]:,} {readable.get(k, k.lower())}' for k in counts.index)
-            parts.append(f'Not directional: {extra}.')
-        return ' '.join(parts)
-
     results = {}
     for gene in genes:
         subset = frame if gene is None else frame[frame['gene'] == gene]
-        heading = title or 'Where Personal Variants Change Predicted Off-Target Risk'
+        heading = title or 'Count of Predicted Off-Target Risk Events by Chromosome'
         if gene:
             heading = f'{gene}: {heading}'
         if cohort_size and 'N =' not in heading:
@@ -521,7 +533,7 @@ def plot_offtarget_events_by_chromosome(events, output_path=None, title=None,
             path = path.with_name(f'{path.stem}_{gene.lower()}{path.suffix}')
 
         results[gene or 'ALL'] = _render_events_by_chromosome(
-            subset, chroms, path, heading, build_caption(subset), show)
+            subset, chroms, path, heading, show)
 
     return pd.concat(results, names=['gene', 'chrom'])
 
@@ -593,7 +605,7 @@ def risk_increasing_guide_by_chromosome(events):
 
 
 def plot_offtarget_events_by_guide(events, output_path=None, title=None,
-                                   subtitle=None, show=True, split_by_gene=True,
+                                   show=True, split_by_gene=True,
                                    all_guides=None):
     """Diverging horizontal bar chart of off-target events per guide.
 
@@ -659,7 +671,7 @@ def plot_offtarget_events_by_guide(events, output_path=None, title=None,
         ax.xaxis.grid(True, linestyle=':', linewidth=0.6, alpha=0.6)
         ax.set_axisbelow(True)
 
-        heading = title or 'Which Guides Carry the Off-Target Risk'
+        heading = title or 'Off-target Risk Count by Guide'
         if gene:
             heading = f'{gene}: {heading}'
         if cohort_size and 'N =' not in heading:
@@ -667,8 +679,6 @@ def plot_offtarget_events_by_guide(events, output_path=None, title=None,
         plt.title(heading, fontsize=13, weight='bold', pad=15)
         plt.xlabel('Observed Events (Haplotype Count)', fontsize=11, weight='bold')
         plt.ylabel('gRNA Identifier', fontsize=11, weight='bold')
-        if subtitle:
-            plt.figtext(0.5, 0.005, subtitle, ha='center', fontsize=9, style='italic')
         ax.legend(loc='lower right', fontsize=9, frameon=True)
         plt.tight_layout()
 
@@ -723,18 +733,21 @@ def plot_risk_site_ancestry_heatmap(events, population_sizes, output_path=None,
                 .reindex(columns=pops, fill_value=0))
     percent = carriers.divide([population_sizes[p] for p in pops], axis=1) * 100
     percent = percent.loc[percent.max(axis=1).sort_values(ascending=False).index]
+    # Both frames are returned together, so they are kept in the same row
+    # order: the caller writes them as a matched pair of tables.
+    carriers = carriers.reindex(index=percent.index)
 
     # At population scale most sites are carried by a handful of people and
     # their rows are a wall of zeros, so only the most frequent are plotted.
-    # The full table is written alongside the figure.
+    # The truncation applies to the figure alone; the returned tables keep
+    # every site, so the full table is written alongside the figure.
     total_sites = len(percent)
     truncated = top_n is not None and total_sites > top_n
-    if truncated:
-        percent = percent.head(top_n)
+    plotted = percent.head(top_n) if truncated else percent
 
-    plt.figure(figsize=(10.5, max(3.0, 0.75 * len(percent) + 1.8)), dpi=300)
+    plt.figure(figsize=(10.5, max(3.0, 0.75 * len(plotted) + 1.8)), dpi=300)
     ax = sns.heatmap(
-        percent.rename(columns=labels), annot=True, fmt='.2f', cmap=ANCESTRY_CMAP, vmin=0,
+        plotted.rename(columns=labels), annot=True, fmt='.2f', cmap=ANCESTRY_CMAP, vmin=0,
         cbar_kws={'label': 'Carriers of \u2265 1 Risk-Increasing Allele (%)'},
         linewidths=0.5, linecolor='lightgray', annot_kws={'weight': 'bold'},
     )
@@ -744,7 +757,7 @@ def plot_risk_site_ancestry_heatmap(events, population_sizes, output_path=None,
     cohort_size = sum(population_sizes[p] for p in pops)
     heading = title or 'Risk-Increasing Off-Target Sites by Genetic Ancestry'
     if truncated:
-        heading = f'{heading}\nTop {len(percent)} of {total_sites} Sites by Carrier Frequency'
+        heading = f'{heading}\nTop {len(plotted)} of {total_sites} Sites by Carrier Frequency'
     if cohort_size and 'N =' not in heading:
         heading = f'{heading}\n(N = {cohort_size:,} Individuals)'
     plt.title(heading, fontsize=13, weight='bold', pad=15)
