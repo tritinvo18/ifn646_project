@@ -40,10 +40,10 @@ flowchart LR
 │   ├── 02_grna_cxcl11_crispri.ipynb     # Task 2: gRNA design and scoring
 │   └── 03_variant_analysis_cxcl11_n2504_genome_wide-KM.ipynb # Task 3: Population variant analysis
 ├── scripts/
-│   ├── 01_rnaseq_de_analysis.R          # Task 1: R script for DE consensus pipeline
-│   ├── download_large_files.sh          # Downloader for large external reference assets
-│   └── setup_task3.sh                   # Comprehensive environment and data prep for Task 3
+│   └── 01_rnaseq_de_analysis.R          # Task 1: R script for DE consensus pipeline
 ├── utils/
+│   ├── download_large_files.sh          # Downloader for large external reference assets
+│   ├── setup_task3.sh                   # Comprehensive environment and data prep for Task 3
 │   ├── task2_utils.py                   # Helper functions for Task 2 analysis and tables
 │   ├── variant_utils.py                 # Core analysis engine for Task 3 VCF parsing & scoring
 │   ├── prepare_n2504_vcfs.py            # Remote indexed VCF extractor from 1000G EBI FTP
@@ -91,7 +91,7 @@ install.packages(c("tidyverse", "VennDiagram", "RColorBrewer"))
 Large reference files (`GRCh38.fa` ~3.1 GB and 1000 Genomes VCFs) are not tracked in Git. Run the automated download script:
 
 ```bash
-bash scripts/download_large_files.sh
+bash utils/download_large_files.sh
 ```
 
 This script:
@@ -143,7 +143,7 @@ jupyter notebook notebooks/02_grna_cxcl11_crispri.ipynb
 Prepare the reference genome, regional VCFs, and run unit tests:
 
 ```bash
-bash scripts/setup_task3.sh
+bash utils/setup_task3.sh
 ```
 
 *(Optional: to extract all 22 autosomes for genome-wide off-target analysis, add `--all-autosomes`)*.

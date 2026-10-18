@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# scripts/download_large_files.sh
+# utils/download_large_files.sh
 #
 # Download and prepare large reference and variant files not tracked in git:
 # 1. Human Reference Genome GRCh38 (FASTA + .fai index) from NCBI
-# 2. 1000 Genomes N=2,504 regional VCFs (Chr 4 and Chr 18) from EBI FTP
+# 2. 1000 Genomes N=2,504 regional VCFs (Chr 4 - CXCL11) from EBI FTP
 #
 # Usage:
-#   bash scripts/download_large_files.sh [--all-autosomes]
+#   bash utils/download_large_files.sh [--all-autosomes]
 #
 # Options:
-#   --all-autosomes   Extract Chr 1-22 VCFs instead of target chromosomes (4 & 18)
+#   --all-autosomes   Extract Chr 1-22 VCFs instead of target chromosome (4)
 # ==============================================================================
 
 set -euo pipefail

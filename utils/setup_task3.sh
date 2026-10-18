@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# scripts/setup_task3.sh
+# utils/setup_task3.sh
 #
 # Complete environment and data preparation script for Task 3:
 # Population-scale variant analysis for CXCL11 (1000 Genomes Project, N=2,504).
@@ -14,7 +14,7 @@
 #   6. Unit test verification (utils/test_variant_utils.py)
 #
 # Usage:
-#   bash scripts/setup_task3.sh [--all-autosomes] [--skip-tests] [--force-vcf]
+#   bash utils/setup_task3.sh [--all-autosomes] [--skip-tests] [--force-vcf]
 # ==============================================================================
 
 set -euo pipefail
@@ -144,7 +144,7 @@ echo "  [OK] Off-target BED:        $(wc -l < "${BED_FILE}") regions"
 # ------------------------------------------------------------------------------
 echo ""
 echo "[Step 4/6] Verifying Reference Genome (GCF_000001405.26 / GRCh38.fa)..."
-bash "${PROJECT_ROOT}/scripts/download_large_files.sh" --${CHROM_MODE}
+bash "${PROJECT_ROOT}/utils/download_large_files.sh" --${CHROM_MODE}
 
 # ------------------------------------------------------------------------------
 # 5. 1000 Genomes Regional VCFs Verification
