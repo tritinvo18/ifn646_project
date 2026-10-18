@@ -1,0 +1,7 @@
+sample_id,donor,condition
+S_2_mock_5dpi_S70002,Donor_2,mock
+S_2_SARS_5dpi_S70003,Donor_2,SARS
+S_2_Rem_5dpi_S70001,Donor_2,Rem
+S_3_mock_5dpi_S69997,Donor_3,mock
+S_3_SARS_5dpi_S69996,Donor_3,SARS
+S_3_Rem_5dpi_S69995,Donor_3,Rem
