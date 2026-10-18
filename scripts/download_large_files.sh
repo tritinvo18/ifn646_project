@@ -34,6 +34,11 @@ echo " Project root: ${PROJECT_ROOT}"
 echo " Data directory: ${DATA_DIR}"
 echo "================================================================="
 
+# Ensure conda environment binaries are in PATH if available
+if [[ -d "/home/jimmy/.conda/envs/ifn646/bin" && ":${PATH}:" != *":/home/jimmy/.conda/envs/ifn646/bin:"* ]]; then
+    export PATH="/home/jimmy/.conda/envs/ifn646/bin:${PATH}"
+fi
+
 # ------------------------------------------------------------------------------
 # 1. GRCh38 Reference Genome (NCBI GCF_000001405.26)
 # ------------------------------------------------------------------------------
@@ -45,33 +50,35 @@ FNA_URL="https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.
 echo ""
 echo "[1/2] Checking GRCh38 Reference Genome..."
 
-if [[ -s "${FASTA_PATH}" ]]; then
-    echo "  [SKIP] GRCh38.fa already present ($(du -h "${FASTA_PATH}" | cut -f1))."
+# 1a. Compressed archive: GCF_000001405.26_GRCh38_genomic.fna.gz
+if [[ -s "${ARCHIVE_PATH}" ]]; then
+    echo "  [SKIP] Compressed archive ${ARCHIVE_PATH##*/} already present ($(du -h "${ARCHIVE_PATH}" | cut -f1))."
 else
-    if [[ ! -s "${ARCHIVE_PATH}" ]]; then
-        echo "  Downloading ${ARCHIVE_PATH##*/} from NCBI..."
-        if command -v curl &>/dev/null; then
-            curl -C - -L --retry 3 -o "${ARCHIVE_PATH}" "${FNA_URL}"
-        elif command -v wget &>/dev/null; then
-            wget -c -O "${ARCHIVE_PATH}" "${FNA_URL}"
-        else
-            python3 -c "
+    echo "  Downloading ${ARCHIVE_PATH##*/} from NCBI..."
+    if command -v curl &>/dev/null; then
+        curl -C - -L --retry 3 -o "${ARCHIVE_PATH}" "${FNA_URL}"
+    elif command -v wget &>/dev/null; then
+        wget -c -O "${ARCHIVE_PATH}" "${FNA_URL}"
+    else
+        python3 -c "
 import urllib.request
 print('Downloading via urllib...')
 urllib.request.urlretrieve('${FNA_URL}', '${ARCHIVE_PATH}')
 "
-        fi
-    else
-        echo "  [SKIP] Compressed archive ${ARCHIVE_PATH##*/} already present."
     fi
+fi
 
+# 1b. Decompressed FASTA: GRCh38.fa
+if [[ -s "${FASTA_PATH}" ]]; then
+    echo "  [SKIP] GRCh38.fa already present ($(du -h "${FASTA_PATH}" | cut -f1))."
+else
     echo "  Decompressing ${ARCHIVE_PATH##*/} -> ${FASTA_PATH}..."
     gzip -dc "${ARCHIVE_PATH}" > "${FASTA_PATH}.tmp"
     mv "${FASTA_PATH}.tmp" "${FASTA_PATH}"
     echo "  Decompression complete: ${FASTA_PATH}"
 fi
 
-# Build FASTA index if missing
+# 1c. FASTA index: GRCh38.fa.fai
 if [[ -s "${FAI_PATH}" ]]; then
     echo "  [SKIP] GRCh38.fa.fai index already present."
 else
