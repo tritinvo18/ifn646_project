@@ -90,15 +90,13 @@ echo ""
 echo "[2/2] Checking 1000 Genomes N=2,504 Regional VCFs (${CHROM_MODE})..."
 
 CHR4_VCF="${VCF_DIR}/sampled_chr4.norm.vcf.gz"
-CHR18_VCF="${VCF_DIR}/sampled_chr18.norm.vcf.gz"
 
 NEED_PREPARE=false
 
 if [[ "${CHROM_MODE}" == "target" ]]; then
-    if [[ -s "${CHR4_VCF}" && -s "${CHR18_VCF}" && -s "${CHR4_VCF}.n2504_regions_complete" ]]; then
-        echo "  [SKIP] Target regional VCFs (Chr 4 & 18) already present:"
+    if [[ -s "${CHR4_VCF}" && -s "${CHR4_VCF}.n2504_regions_complete" ]]; then
+        echo "  [SKIP] Target regional VCF (Chr 4 - CXCL11) already present:"
         echo "         - ${CHR4_VCF}"
-        echo "         - ${CHR18_VCF}"
     else
         NEED_PREPARE=true
     fi

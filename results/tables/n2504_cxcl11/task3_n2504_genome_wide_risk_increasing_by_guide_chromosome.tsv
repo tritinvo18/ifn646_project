@@ -1,5 +1,4 @@
-gene	guide_id	chr4	chr18	total
-CXCL11	145rev	88	0	88
-CXCL11	77forw	0	9	9
-CXCL11	261rev	7	0	7
-CXCL11	295forw	6	0	6
+gene	guide_id	chr4	total
+CXCL11	145rev	88	88
+CXCL11	261rev	7	7
+CXCL11	295forw	6	6

@@ -29,9 +29,9 @@ REFSEQ = {
 ORDER = {str(i): i for i in range(1, 23)} | {"X": 23}
 
 ON_TARGET = {
-    "4": [(76035800 - 1, 76036350, "CXCL11_on_target")],
-    "18": [(63887550 - 1, 63887950, "SERPINB2_on_target")]
+    "4": [(76035800 - 1, 76036350, "CXCL11_on_target")]
 }
+
 
 def get_bcftools_bin() -> str:
     path = shutil.which("bcftools")
@@ -141,7 +141,7 @@ def main():
     reg, excluded = regions(bed_all)
 
     if a.chromosomes == "target":
-        wanted = {"4", "18"}
+        wanted = {"4"}
     elif a.chromosomes == "autosomes":
         wanted = {str(i) for i in range(1, 23)}
     else:
@@ -207,7 +207,7 @@ def main():
             print(f"ERROR chromosome {chrom}: {e}", file=sys.stderr)
             manifest.append([chrom, "FAILED", str(output), url, str(e)])
 
-    manifest_file = tables / "n2504" / "task3_n2504_vcf_manifest.tsv"
+    manifest_file = tables / "n2504_cxcl11" / "task3_n2504_vcf_manifest.tsv"
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
     with manifest_file.open("w", newline="") as h:
         w = csv.writer(h, delimiter="\t")
