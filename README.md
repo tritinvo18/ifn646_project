@@ -71,7 +71,7 @@ conda activate ifn646
 
 # Install bioinformatics tools and Python packages
 conda install -c bioconda -c conda-forge bcftools samtools pysam -y
-pip install pandas numpy matplotlib seaborn scipy openpyxl jupyter
+pip install pandas numpy matplotlib seaborn scipy openpyxl jupyter xldr
 ```
 
 ### 3. R Dependencies (Task 1)
