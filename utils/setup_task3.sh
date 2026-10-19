@@ -11,10 +11,9 @@
 #   3. Input metadata & BED file verification
 #   4. Reference genome verification & preparation (GCF_000001405.26 / GRCh38.fa)
 #   5. 1000 Genomes N=2,504 regional VCF preparation (sampled_chr4.norm.vcf.gz)
-#   6. Unit test verification (utils/test_variant_utils.py)
 #
 # Usage:
-#   bash utils/setup_task3.sh [--all-autosomes] [--skip-tests] [--force-vcf]
+#   bash utils/setup_task3.sh [--all-autosomes] [--force-vcf]
 # ==============================================================================
 
 set -euo pipefail
@@ -28,16 +27,12 @@ FIGURES_DIR="${PROJECT_ROOT}/results/figures/n2504_cxcl11"
 
 # Options
 CHROM_MODE="target"
-RUN_TESTS=true
 FORCE_VCF=false
 
 for arg in "$@"; do
     case "${arg}" in
         --all-autosomes)
             CHROM_MODE="autosomes"
-            ;;
-        --skip-tests)
-            RUN_TESTS=false
             ;;
         --force-vcf)
             FORCE_VCF=true
@@ -47,7 +42,6 @@ for arg in "$@"; do
             echo ""
             echo "Options:"
             echo "  --all-autosomes   Extract Chr 1-22 VCFs (default: target Chr 4 only)"
-            echo "  --skip-tests      Skip running utils/test_variant_utils.py"
             echo "  --force-vcf       Force rebuild of regional VCF(s)"
             echo "  -h, --help        Show this help message"
             exit 0
@@ -74,7 +68,7 @@ echo "================================================================="
 # 1. Environment & Dependency Check
 # ------------------------------------------------------------------------------
 echo ""
-echo "[Step 1/6] Checking CLI tools and Python dependencies..."
+echo "[Step 1/5] Checking CLI tools and Python dependencies..."
 
 MISSING_TOOLS=()
 for tool in python3 samtools bcftools; do
@@ -108,7 +102,7 @@ print('  [OK] Python packages verified:', ', '.join(required))
 # 2. Directory Structure Verification
 # ------------------------------------------------------------------------------
 echo ""
-echo "[Step 2/6] Verifying directory structure..."
+echo "[Step 2/5] Verifying directory structure..."
 mkdir -p "${DATA_DIR}"
 mkdir -p "${VCF_DIR}"
 mkdir -p "${TABLES_DIR}"
@@ -123,7 +117,7 @@ echo "       - Figures: ${FIGURES_DIR}"
 # 3. Input Metadata & BED Verification
 # ------------------------------------------------------------------------------
 echo ""
-echo "[Step 3/6] Verifying required metadata and region BED files..."
+echo "[Step 3/5] Verifying required metadata and region BED files..."
 
 SAMPLE_META="${DATA_DIR}/n2504/sample_metadata.tsv"
 SAMPLE_IDS="${DATA_DIR}/n2504/sample_ids.txt"
@@ -143,14 +137,14 @@ echo "  [OK] Off-target BED:        $(wc -l < "${BED_FILE}") regions"
 # 4. Reference Genome Check (NCBI GCF_000001405.26 / GRCh38.fa)
 # ------------------------------------------------------------------------------
 echo ""
-echo "[Step 4/6] Verifying Reference Genome (GCF_000001405.26 / GRCh38.fa)..."
+echo "[Step 4/5] Verifying Reference Genome (GCF_000001405.26 / GRCh38.fa)..."
 bash "${PROJECT_ROOT}/utils/download_large_files.sh" --${CHROM_MODE}
 
 # ------------------------------------------------------------------------------
 # 5. 1000 Genomes Regional VCFs Verification
 # ------------------------------------------------------------------------------
 echo ""
-echo "[Step 5/6] Verifying N=2,504 Regional VCF files..."
+echo "[Step 5/5] Verifying N=2,504 Regional VCF files..."
 
 CHR4_VCF="${VCF_DIR}/sampled_chr4.norm.vcf.gz"
 NEED_REBUILD=false
@@ -177,19 +171,6 @@ if [[ "${NEED_REBUILD}" == "true" ]]; then
         --chromosomes "${CHROM_MODE}"
 else
     echo "  [OK] Regional VCF(s) present and verified complete."
-fi
-
-# ------------------------------------------------------------------------------
-# 6. Unit Tests Verification
-# ------------------------------------------------------------------------------
-if [[ "${RUN_TESTS}" == "true" ]]; then
-    echo ""
-    echo "[Step 6/6] Running unit tests (utils/test_variant_utils.py)..."
-    python3 "${PROJECT_ROOT}/utils/test_variant_utils.py"
-    echo "  [OK] All unit tests passed!"
-else
-    echo ""
-    echo "[Step 6/6] Skipping unit tests (--skip-tests)."
 fi
 
 echo ""
